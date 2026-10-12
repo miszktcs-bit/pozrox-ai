@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>POZROX AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #000000; color: #ffffff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: #000000; }
+        ::-webkit-scrollbar-thumb { background: #222222; border-radius: 2px; }
+        .border-mono { border-color: #1a1a1a; }
+        .bg-card { background-color: #0a0a0a; }
+        .bg-user { background-color: #18181b; }
+        .modal-overlay { background-color: rgba(0, 0, 0, 0.9); backdrop-filter: blur(10px); }
+        pre { background-color: #111111 !important; border: 1px solid #222222; border-radius: 8px; padding: 12px; overflow-x: auto; color: #e5e5e5; font-family: monospace; font-size: 13px; }
+    </style>
+</head>
+<body class="bg-black text-white h-screen flex flex-col overflow-hidden">
+<div class="flex flex-col h-screen max-w-3xl mx-auto w-full border-x border-mono">
+    <header class="flex items-center justify-between px-4 py-3 border-b border-mono bg-black z-10">
+        <div class="flex items-center space-x-3">
+            <div class="w-8 h-8 rounded-full bg-white text-black flex items-center justify-center font-bold text-sm">PZ</div>
+            <span class="font-bold text-base tracking-wide text-white">POZROX AI</span>
+        </div>
+        <button id="googleLoginBtn" onclick="toggleGoogleLogin()" class="flex items-center space-x-2 bg-white text-black hover:bg-gray-200 px-3 py-1.5 rounded-full text-xs font-semibold transition">
+            <i class="fab fa-google"></i>
+            <span id="loginText">Entrar com Google</span>
+        </button>
+    </header>
+    <main id="chatContainer" class="flex-1 overflow-y-auto p-4 space-y-4">
+        <div class="flex space-x-3 items-start">
+            <div class="w-7 h-7 rounded-full bg-white text-black flex items-center justify-center font-bold text-xs shrink-0 mt-1">PZ</div>
+            <div class="flex-1 bg-card border border-mono p-4 rounded-2xl text-sm leading-relaxed text-gray-200">
+                Opa, beleza? Já tô por aqui! Sem limites e com histórico salvo. O que vamos mandar hoje?
+            </div>
+        </div>
+    </main>
+    <div id="attachmentPreview" class="hidden px-4 py-2 bg-black border-t border-mono flex items-center space-x-3">
+        <div class="relative">
+            <img id="previewImage" src="" class="w-12 h-12 object-cover rounded-lg border border-mono">
+            <button onclick="removeAttachment()" class="absolute -top-2 -right-2 bg-white text-black rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">&times;</button>
+        </div>
+        <span class="text-xs text-gray-400" id="previewFilename">Mídia anexada</span>
+    </div>
+    <footer class="p-4 border-t border-mono bg-black">
+        <form id="chatForm" onsubmit="handleSend(event)" class="flex items-center space-x-2">
+            <button type="button" onclick="openPlusMenu()" class="w-10 h-10 rounded-full border border-mono bg-card text-white hover:bg-white hover:text-black flex items-center justify-center transition shrink-0">
+                <i class="fas fa-plus text-sm"></i>
+            </button>
+            <input type="text" id="userInput" autocomplete="off" placeholder="Digite sem limites..." class="flex-1 bg-card border border-mono rounded-full px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-white transition">
+            <button type="submit" class="w-10 h-10 rounded-full bg-white text-black hover:bg-gray-200 flex items-center justify-center transition shrink-0 font-bold">
+                <i class="fas fa-arrow-up text-sm"></i>
+            </button>
+        </form>
+    </footer>
+</div>
+<div id="plusModal" class="fixed inset-0 modal-overlay hidden z-50 flex items-end sm:items-center justify-center p-4">
+    <div class="bg-black border border-mono w-full max-w-md rounded-2xl p-5 space-y-4">
+        <div class="flex items-center justify-between border-b border-mono pb-3">
+            <h3 class="font-bold text-base text-white">Opções de Mídia</h3>
+            <button onclick="closePlusMenu()" class="text-gray-400 hover:text-white"><i class="fas fa-times text-lg"></i></button>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+            <button onclick="triggerFileInput()" class="p-4 border border-mono rounded-xl bg-card hover:border-white text-left transition flex flex-col justify-between space-y-3">
+                <i class="fas fa-image text-xl text-white"></i>
+                <div><div class="font-semibold text-sm text-white">Galeria</div><div class="text-xs text-gray-500">Enviar imagem</div></div>
+            </button>
+            <button onclick="generateInAppImage()" class="p-4 border border-mono rounded-xl bg-card hover:border-white text-left transition flex flex-col justify-between space-y-3">
+                <i class="fas fa-wand-magic-sparkles text-xl text-white"></i>
+                <div><div class="font-semibold text-sm text-white">Gerar Foto</div><div class="text-xs text-gray-500">Criar no app</div></div>
+            </button>
+        </div>
+    </div>
+</div>
+<input type="file" id="fileInput" accept="image/*" class="hidden" onchange="handleFileSelect(event)">
+<script>
+    let isLoggedIn = false, attachedImageData = null;
+    document.addEventListener("DOMContentLoaded", loadHistory);
+    function toggleGoogleLogin() {
+        isLoggedIn = !isLoggedIn;
+        document.getElementById('loginText').innerText = isLoggedIn ? 'Conectado' : 'Entrar com Google';
+        document.getElementById('googleLoginBtn').className = isLoggedIn ? 'flex items-center space-x-2 bg-gray-800 text-white px-3 py-1.5 rounded-full text-xs font-semibold transition' : 'flex items-center space-x-2 bg-white text-black px-3 py-1.5 rounded-full text-xs font-semibold transition';
+    }
+    function openPlusMenu() { document.getElementById('plusModal').classList.remove('hidden'); }
+    function closePlusMenu() { document.getElementById('plusModal').classList.add('hidden'); }
+    function triggerFileInput() { closePlusMenu(); document.getElementById('fileInput').click(); }
+    function handleFileSelect(event) {
+        const file = event.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = e => setAttachment(e.target.result, file.name);
+            reader.readAsDataURL(file);
+        }
+    }
+    function setAttachment(src, name) {
+        attachedImageData = src;
+        document.getElementById('previewImage').src = src;
+        document.getElementById('previewFilename').innerText = name;
+        document.getElementById('attachmentPreview').classList.remove('hidden');
+    }
+    function removeAttachment() {
+        attachedImageData = null;
+        document.getElementById('attachmentPreview').classList.add('hidden');
+        document.getElementById('fileInput').value = '';
+    }
+    function handleSend(e) {
+        e.preventDefault();
+        const inputEl = document.getElementById('userInput'), text = inputEl.value.trim();
+        if (!text && !attachedImageData) return;
+        appendUserMessage(text, attachedImageData);
+        saveToHistory('user', text, attachedImageData);
+        inputEl.value = '';
+        const currentAttachment = attachedImageData;
+        removeAttachment();
+        setTimeout(() => generateAIResponse(text, currentAttachment), 400);
+    }
+    function appendUserMessage(text, imageSrc) {
+        const container = document.getElementById('chatContainer'), div = document.createElement('div');
+        div.className = "flex justify-end items-start space-x-2";
+        div.innerHTML = `<div class="bg-user border border-mono p-3 rounded-2xl text-sm text-white max-w-lg">${imageSrc ? `<img src="${imageSrc}" class="max-w-xs rounded-xl border border-mono mb-2">` : ''}${text ? `<div>${escapeHtml(text)}</div>` : ''}</div>`;
+        container.appendChild(div);
+        container.scrollTop = container.scrollHeight;
+    }
+    function generateAIResponse(userText, imageSrc) {
+        const container = document.getElementById('chatContainer'), div = document.createElement('div');
+        div.className = "flex space-x-3 items-start";
+        let res = "Fechado! Sem limites por aqui. Pode mandar o comando, o script ou o que precisar que eu executo direto.";
+        const lower = userText.toLowerCase();
+        if (lower.includes('! hack')) res = `Comando executado:\n<pre>cmd package compile -m speed-profile -a\nsettings put global window_animation_scale 0.0</pre>`;
+        else if (lower.includes('! script')) res = `Script pronto:\n<pre># POZROX OPTIMIZE\nsettings put global animator_duration_scale 0.0</pre>`;
+        div.innerHTML = `<div class="w-7 h-7 rounded-full bg-white text-black flex items-center justify-center font-bold text-xs shrink-0 mt-1">PZ</div><div class="bg-card border border-mono p-4 rounded-2xl text-sm text-gray-200 flex-1 leading-relaxed">${res.replace(/\n/g, '<br>')}</div>`;
+        container.appendChild(div);
+        container.scrollTop = container.scrollHeight;
+        saveToHistory('ai', res);
+    }
+    function saveToHistory(sender, text, imageSrc = null) {
+        let history = JSON.parse(localStorage.getItem('pozrox_chat_history') || '[]');
+        history.push({ sender, text, imageSrc });
+        localStorage.setItem('pozrox_chat_history', JSON.stringify(history));
+    }
+    function loadHistory() {
+        let history = JSON.parse(localStorage.getItem('pozrox_chat_history') || '[]');
+        history.forEach(msg => {
+            if (msg.sender === 'user') appendUserMessage(msg.text, msg.imageSrc);
+            else {
+                const container = document.getElementById('chatContainer'), div = document.createElement('div');
+                div.className = "flex space-x-3 items-start";
+                div.innerHTML = `<div class="w-7 h-7 rounded-full bg-white text-black flex items-center justify-center font-bold text-xs shrink-0 mt-1">PZ</div><div class="bg-card border border-mono p-4 rounded-2xl text-sm text-gray-200 flex-1 leading-relaxed">${msg.text.replace(/\n/g, '<br>')}</div>`;
+                container.appendChild(div);
+            }
+        });
+        document.getElementById('chatContainer').scrollTop = document.getElementById('chatContainer').scrollHeight;
+    }
+    function escapeHtml(text) { return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+</script>
+</body>
+</html>
